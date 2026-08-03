@@ -1,0 +1,59 @@
+# =====================================
+# Virtual Environment
+# =====================================
+.venv/
+venv/
+
+# =====================================
+# Python
+# =====================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# =====================================
+# Jupyter
+# =====================================
+.ipynb_checkpoints/
+
+# =====================================
+# IDE
+# =====================================
+.vscode/
+.idea/
+
+# =====================================
+# Environment Variables
+# =====================================
+.env
+
+# =====================================
+# Operating System
+# =====================================
+.DS_Store
+Thumbs.db
+
+# =====================================
+# Processed Data
+# =====================================
+data/processed/*
+
+# =====================================
+# Models
+# Keep only the final tuned model
+# =====================================
+models/*
+!models/xgboost_tuned.pkl
+
+# =====================================
+# Reports
+# Ignore generated reports but keep screenshots
+# =====================================
+reports/*
+!reports/figures/
+reports/figures/*
+!reports/figures/dashboard_overview.png
+!reports/figures/forecast_chart.png
+!reports/figures/capacity_table.png

@@ -1,0 +1,17 @@
+.venv
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints
+
+notebooks
+tests
+reports
+data/raw
+data/processed/feature_dataset.csv
+
+.DS_Store
+Thumbs.db
