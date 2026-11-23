@@ -1,347 +1,67 @@
-# 📈 Workforce Demand Forecasting & Capacity Planning
+# Workforce Demand Forecasting & Capacity Planning
 
-> An end-to-end machine learning platform for forecasting workforce demand and supporting operational capacity planning using time-series forecasting, XGBoost, Streamlit, and Docker.
+This synthetic demo forecasts daily incoming workforce operations requests in three regions and converts the forecast into an assumptions-based staffing scenario. Requests include onboarding support, worker extensions, data corrections, and new worker requests. The dashboard shows the historical forecast origin, planning dates, daily expected capacity, and required and additional scheduled staff. It exports the daily plan as CSV.
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![XGBoost](https://img.shields.io/badge/Model-XGBoost-success)
-![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
-![Docker](https://img.shields.io/badge/Container-Docker-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+## Quickstart
 
----
-
-# Overview
-
-Organizations continuously receive workforce-related requests such as onboarding, worker extensions, data corrections, and operational support. Predicting future demand enables managers to proactively allocate staff, reduce backlog, and improve operational efficiency.
-
-This project simulates an enterprise workforce management environment and implements a complete machine learning pipeline to forecast future request volumes and evaluate workforce capacity under different staffing scenarios.
-
-The solution includes:
-
-- Synthetic enterprise workforce dataset generation
-- Time-series feature engineering
-- Multiple forecasting models
-- Hyperparameter tuning using time-aware cross-validation
-- Recursive demand forecasting
-- Interactive Streamlit dashboard
-- Capacity planning and staffing recommendations
-- Dockerized deployment
-
----
-
-# Project Architecture
-
-```
-                Workforce Requests
-                        │
-                        ▼
-          Synthetic Data Generation
-                        │
-                        ▼
-            Feature Engineering Pipeline
-        (Lag • Rolling • Calendar Features)
-                        │
-                        ▼
-          Model Training & Validation
-      ┌──────────┬─────────────┬──────────┐
-      │ Baseline │ RandomForest│ XGBoost  │
-      └──────────┴─────────────┴──────────┘
-                        │
-                Best Performing Model
-                        │
-                        ▼
-             Future Demand Forecasting
-                        │
-                        ▼
-          Capacity Planning Engine
-                        │
-                        ▼
-          Streamlit Decision Dashboard
-```
-
----
-
-# Features
-
-## Data Engineering
-
-- Synthetic workforce demand generation
-- Daily operational request simulation
-- Multi-region support
-- Calendar-based demand patterns
-- Holiday and weekend effects
-- Workforce availability simulation
-
----
-
-## Feature Engineering
-
-The forecasting model uses engineered time-series features including:
-
-- Lag Features (1, 2, 7, 14 and 30 days)
-- Rolling Mean (7 and 30 days)
-- Rolling Standard Deviation
-- Cyclical Day Encoding
-- Cyclical Month Encoding
-- Week of Year
-- Quarter
-- Staff Availability
-- Staff Absence Rate
-- Holiday Indicators
-
----
-
-## Machine Learning Models
-
-Models evaluated:
-
-| Model | Purpose |
-|---------|----------|
-| Naive Lag Baseline | Benchmark |
-| Linear Regression | Linear baseline |
-| Random Forest | Ensemble model |
-| XGBoost | Final production model |
-
----
-
-# Model Performance
-
-| Model | MAE | RMSE |
-|--------|------:|------:|
-| Naive Baseline | 8.95 | 12.81 |
-| Linear Regression | 7.26 | 10.16 |
-| Random Forest | 5.95 | 9.01 |
-| **Tuned XGBoost** | **5.78** | **8.82** |
-
-Final Production Model
-
-- MAE: **5.78**
-- RMSE: **8.82**
-- WAPE: **15.84%**
-- Time-aware Cross Validation
-- Recursive Multi-step Forecasting
-
----
-
-# Dashboard
-
-The application provides an interactive decision-support interface for workforce planning.
-
-## Executive Dashboard
-
-The landing page summarizes forecasted demand, available capacity, utilization, capacity risk, and automatically generates staffing recommendations.
-
-![Dashboard](docs/images/dashboard_overview.png)
-
----
-
-## Historical Demand & Forecast
-
-Visual comparison of historical operational demand, predicted future demand, and available workforce capacity.
-
-![Forecast](docs/images/forecast_chart.png)
-
----
-
-## Capacity Planning Table
-
-Daily operational planning including predicted requests, workforce utilization, required staffing, and capacity status.
-
-![Capacity Plan](docs/images/capacity_table.png)
-
-# Folder Structure
-
-```
-workforce-demand-capacity-planning/
-
-│
-├── app/
-│   └── app.py
-│
-├── data/
-│   ├── raw/
-│   └── processed/
-│
-├── models/
-│
-├── reports/
-│
-├── src/
-│   ├── generate_data.py
-│   ├── features.py
-│   ├── train.py
-│   ├── tune_xgboost.py
-│   ├── evaluate.py
-│   └── forecast.py
-│
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── README.md
-└── LICENSE
-```
-
----
-
-# Installation
-
-Clone the repository
+Use Python 3.12 and run the commands from the repository root.
 
 ```bash
-git clone https://github.com/<your-username>/workforce-demand-capacity-planning.git
-
+git clone https://github.com/Vai-bhv/workforce-demand-capacity-planning.git
 cd workforce-demand-capacity-planning
-```
-
-Create a virtual environment
-
-```bash
-python -m venv .venv
-```
-
-Activate
-
-Linux / macOS
-
-```bash
+python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-Windows
-
-```bash
-.venv\Scripts\activate
-```
-
-Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-# Running the Project
-
-## Generate Synthetic Data
-
-```bash
-python src/generate_data.py
-```
-
----
-
-## Create Time-Series Features
-
-```bash
-python src/features.py
-```
-
----
-
-## Train Models
-
-```bash
-python src/train.py
-```
-
----
-
-## Hyperparameter Tuning
-
-```bash
-python src/tune_xgboost.py
-```
-
----
-
-## Model Evaluation
-
-```bash
-python src/evaluate.py
-```
-
----
-
-## Generate Future Forecast
-
-```bash
-python src/forecast.py
-```
-
----
-
-## Launch Dashboard
-
-```bash
+python -m pip install -r requirements-app.txt
+python -m src.prepare_data \
+  --input data/raw/workforce_demand.csv \
+  --output-dir data/processed
 streamlit run app/app.py
 ```
 
----
+Open http://localhost:8501. The tracked source produces 3,288 regional rows and 3,198 feature rows. Preparation writes the two processed CSVs to the specified directory. Choose a fresh directory to avoid replacing earlier outputs. Set `WORKFORCE_HISTORY_PATH` to the resulting `daily_regional_demand.csv` to launch from a different preparation directory.
 
-# Docker
-
-Build
+### Docker
 
 ```bash
 docker build -t workforce-capacity-planner .
+docker run --rm -p 127.0.0.1:8501:8501 workforce-capacity-planner
 ```
 
-Run
+Docker prepares the data at build time from the tracked raw CSV. The image uses a non-root account and serves the same baseline dashboard. The notebook, locally generated files, and saved model are unnecessary for this build. The health check probes the Streamlit server. The planner smoke test below checks the calculations through the UI.
+
+## Forecast and capacity assumptions
+
+The forecast starts the day after the last observation for the selected region. It repeats the last seven complete, observed daily values in the same weekday order for the selected horizon. With the tracked dataset, the origin is 2025-12-31. The default horizon is 14 days. The forecast only uses observations up to the origin, and the scenario inputs affect capacity independently of arrivals.
+
+| Quantity | Calculation |
+|---|---|
+| Expected available staff | Scheduled staff × (1 − expected absence rate) |
+| Expected processing capacity per day | Expected available staff × requests per available person-day |
+| Minimum required scheduled staff | Daily forecast arrivals divided by expected capacity per scheduled person, rounded up |
+| Additional scheduled staff | Required scheduled staff minus current scheduled staff, floored at zero |
+
+The scenario assumes one interchangeable staff pool, a constant absence rate and productivity, and a single daily count of arriving requests. Expected availability may be fractional. Zero scheduled staff gives zero current capacity; a finite headcount requirement still exists when each additional scheduled person contributes positive capacity. With 100% absence or zero productivity, positive demand has no finite headcount requirement. The dashboard covers incoming work under a point forecast. Opening backlog, skill constraints, service times, and SLAs are outside the calculation.
+
+## Synthetic data and known discrepancy
+
+[The tracked raw CSV](data/raw/workforce_demand.csv) covers 2023–2025 with one row per date, region, and request type. [The generator](src/generate_data.py) defines the calendar effects, including strong weekdays and weekends, a shared holiday period, regional growth, and occasional random spikes. These patterns are features of the simulator. The data contains no observed enterprise staffing or service outcomes.
+
+[Preparation](src/prepare_data.py) validates the required schema, unique keys, a complete daily panel across the observed regions and request types, nonnegative integer counts, and agreement between the repeated region-day attributes. It sums type-level arrivals and completions and carries forward the recorded regional attributes. [Feature engineering](src/features.py) uses strictly earlier, explicitly grouped observations and drops the first 30 days in each region from the feature export.
+
+On **1,058 region-days with a previous observed backlog**, recorded completions disagree with previous backlog plus arrivals minus ending backlog. This check excludes the first observed day in each region because its initial backlog is absent from the CSV. The generator updates backlog from the simulated regional completion count, then allocates and rounds completions using the mix of new arrivals. This can lose completions when arrivals are zero or change their sum through rounding. Preparation reports the discrepancy and preserves both fields. The demo capacity calculation uses neither field.
+
+## Historical XGBoost experiment
+
+The original [training](src/train.py), [tuning](src/tune_xgboost.py), [evaluation](src/evaluate.py), [recursive forecast](src/forecast.py), and [saved artifact](models/xgboost_tuned.pkl) are retained. Use the original [experiment dependencies](requirements.txt) in a separate Python 3.12 environment to inspect or rerun those workflows. The legacy scripts write to repository-relative output locations, including the tracked tuned artifact during tuning. Run experiments in a scratch checkout and prepare the inputs there first. The legacy prediction and evaluation paths deserialize pickle files, so use only trusted artifacts.
+
+The historical evaluation uses chronological date splits and precomputed rows containing observed demand lags and realized same-day staffing. It describes one-step-style prediction with refreshed inputs, including staffing that may be unavailable at a planning origin. The recursive forecast substitutes its own future lag values and uses assumed staffing. Its multi-step forecast accuracy remains unvalidated. The default demo uses the weekly baseline because its information at the forecast origin is explicit. Comparing it with XGBoost requires a matched-horizon rolling-origin backtest.
+
+The [EDA notebook](notebooks/01_exploratory_data_analysis.ipynb) is an optional historical exploration. Use the preparation command for the supported data workflow.
+
+## Tests
 
 ```bash
-docker run -p 8501:8501 workforce-capacity-planner
+python -B -m unittest discover -s tests -v
 ```
 
----
-
-# Business Use Cases
-
-The project demonstrates how machine learning can support operational decision-making by:
-
-- Forecasting future workforce demand
-- Identifying staffing shortages
-- Estimating workforce capacity
-- Supporting workforce planning
-- Reducing operational backlog
-- Improving resource allocation
-
----
-
-# Future Improvements
-
-Potential extensions include:
-
-- SHAP model explainability
-- Automated model retraining
-- Cloud deployment
-- Real enterprise workforce data
-- API integration
-- Live scheduling optimisation
-
----
-
-# Technologies
-
-- Python
-- Pandas
-- NumPy
-- Scikit-learn
-- XGBoost
-- Streamlit
-- Plotly
-- Docker
-
----
-
-# Author
-
-**Vaibhav Gupta**
-
-Data Analyst | Aspiring Data Scientist
-
----
-
-# License
-
-This project is licensed under the MIT License.
+The tests cover deterministic preparation from a source-only copy, regional aggregation and validation, forecast origin and weekly repetition, capacity calculations, and a Streamlit scenario that changes staffing inputs while holding arrivals fixed.

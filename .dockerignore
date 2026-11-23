@@ -10,8 +10,8 @@ __pycache__
 notebooks
 tests
 reports
-data/raw
-data/processed/feature_dataset.csv
+models
+data/processed
 
 .DS_Store
 Thumbs.db
