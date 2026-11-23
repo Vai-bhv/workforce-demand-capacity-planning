@@ -54,14 +54,52 @@ On **1,058 region-days with a previous observed backlog**, recorded completions 
 
 The original [training](src/train.py), [tuning](src/tune_xgboost.py), [evaluation](src/evaluate.py), [recursive forecast](src/forecast.py), and [saved artifact](models/xgboost_tuned.pkl) are retained. Use the original [experiment dependencies](requirements.txt) in a separate Python 3.12 environment to inspect or rerun those workflows. The legacy scripts write to repository-relative output locations, including the tracked tuned artifact during tuning. Run experiments in a scratch checkout and prepare the inputs there first. The legacy prediction and evaluation paths deserialize pickle files, so use only trusted artifacts.
 
-The historical evaluation uses chronological date splits and precomputed rows containing observed demand lags and realized same-day staffing. It describes one-step-style prediction with refreshed inputs, including staffing that may be unavailable at a planning origin. The recursive forecast substitutes its own future lag values and uses assumed staffing. Its multi-step forecast accuracy remains unvalidated. The default demo uses the weekly baseline because its information at the forecast origin is explicit. Comparing it with XGBoost requires a matched-horizon rolling-origin backtest.
+The historical evaluation uses chronological splits and precomputed rows with observed demand lags and realized same-day staffing. It measures one-step-style prediction with refreshed inputs. The historical recursive forecast substitutes predictions for future lag values and uses assumed staffing. Its multi-step accuracy remains unvalidated. The benchmark below fits a separate, direct XGBoost candidate from source.
 
 The [EDA notebook](notebooks/01_exploratory_data_analysis.ipynb) is an optional historical exploration. Use the preparation command for the supported data workflow.
+
+## Rolling-origin forecast benchmark
+
+This is a **retrospective synthetic benchmark**. The October–December 2025 period was examined in the historical experiment. The target is daily incoming requests per region. Each forecast is issued on the last fully observed date and uses arrivals through that date plus known calendar features. Staffing, realized absence, and realized future arrivals are excluded. All four methods forecast 30 days from the same origin and clip negative predictions to zero without rounding.
+
+| Candidate | Method |
+|---|---|
+| Weekly seasonal naïve | Phase 1 baseline. Repeat the last observed seven days with weekday alignment. |
+| Same-weekday average | Average the four latest observations of each weekday. Requires 28 complete daily observations. |
+| Calendar ridge | Ridge with alpha 10. Uses region, weekday, month, month-end, the simulator's fixed year-end holiday dates, and overall and regional elapsed-time trends. Refit on observed arrivals at each origin. |
+| Direct XGBoost | A single pooled model predicts all 30 leads using the same calendar inputs, lead, most recent matching weekday, mean of the last four matching weekdays, and trailing 7- and 28-day arrival means. Training constructs weekly historical forecast issues with all labels observed by the current origin. Training and inference share a feature builder, and later leads use the same issue-time information. Uses a fixed 160-tree CPU configuration with depth 3, learning rate 0.05, and seed 42. |
+
+Development uses 35 Monday origins from 2025-01-06 through 2025-09-01. The final retrospective evaluation uses nine Monday origins from 2025-10-06 through 2025-12-01. Each origin has at least 365 observed days and all 30 target dates. Development targets end on 2025-10-01 and final targets start on 2025-10-07. Models may refit on arrivals observed since earlier origins within the fixed protocol. Horizon metrics pool leads 1 through H over all regions and origins. Exact-lead metrics are reported separately. Overlapping windows reuse some target dates, so paired origin scores are descriptive and are not independent confidence samples.
+
+The selection rule uses only 14-day development MAE, the default demo horizon. It picks the simplest candidate within the larger of 0.25 requests or 2% of the best MAE, in the order listed above. Direct XGBoost was selected with development MAE **5.92**, ahead of calendar ridge at **6.29** by more than the **0.25** tolerance. The dashboard continues to use weekly seasonal naïve. The benchmark measures retrospective accuracy on generator-defined patterns and does not establish that a model should be deployed.
+
+**Final retrospective MAE** in requests per region-day
+
+| Candidate | 7 days | 14 days | 30 days |
+|---|---:|---:|---:|
+| Weekly seasonal naïve | 9.11 | 9.50 | 11.38 |
+| Same-weekday average | 7.95 | 8.35 | 10.48 |
+| Calendar ridge | 7.46 | 7.20 | 7.00 |
+| Direct XGBoost | **6.45** | **6.26** | **6.29** |
+
+At 14 days, direct XGBoost beat ridge on eight of nine final origins. Their MAE differed by just 0.02 requests in Asia Pacific. On 116 high-demand forecast rows, direct XGBoost MAE was 7.08 with mean signed bias of −4.79 requests. High demand means actual arrivals met or exceeded the region's historical 90th percentile at the forecast origin. These are forecast rows and may share target dates.
+
+Run from the repository root with Python 3.12. Reports stay under the ignored `reports/` directory by default in this example.
+
+```bash
+python -m pip install -r requirements-backtest.txt
+python -B -m src.backtest --input data/raw/workforce_demand.csv --output-dir reports/backtest
+```
+
+Use `--smoke` for one origin per split. The output includes keyed predictions, a manifest with the input hash and model-selection decision, and CSV summaries by horizon, region, exact lead, origin, and demand level. MAE, RMSE, and signed bias are in requests. WAPE is left blank for groups with zero total actual demand.
+
+The unique key in `predictions.csv` is `forecast_origin, region, model_name, horizon, lead, target_date`. Horizons are cumulative, so leads 1–7 appear in the 7-, 14-, and 30-day views. Filter to `horizon=30` for one row per origin, region, model, lead, and target date.
 
 ## Tests
 
 ```bash
+python -m pip install -r requirements-app.txt -r requirements-backtest.txt
 python -B -m unittest discover -s tests -v
 ```
 
-The tests cover deterministic preparation from a source-only copy, regional aggregation and validation, forecast origin and weekly repetition, capacity calculations, and a Streamlit scenario that changes staffing inputs while holding arrivals fixed.
+The tests cover preparation, leakage and feature parity, repeatable benchmark output, capacity calculations, and a Streamlit scenario that changes staffing inputs while holding arrivals fixed.
