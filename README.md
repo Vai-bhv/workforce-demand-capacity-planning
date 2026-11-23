@@ -95,6 +95,40 @@ Use `--smoke` for one origin per split. The output includes keyed predictions, a
 
 The unique key in `predictions.csv` is `forecast_origin, region, model_name, horizon, lead, target_date`. Horizons are cumulative, so leads 1–7 appear in the 7-, 14-, and 30-day views. Filter to `horizon=30` for one row per origin, region, model, lead, and target date.
 
+## Budget-matched staffing replay
+
+For each of the nine final Monday origins, the replay issues a 14-day schedule for each region. Each episode starts with **zero synthetic backlog** under all three policies. Budgets use the generator's nominal roster and permit two fewer or two more scheduled staff per day. The budget, bounds, zero opening balance, and threshold of 20 requests were fixed before evaluating policy outcomes.
+
+| Region | Fixed staff per day | Daily bounds | Staff-days per episode |
+|---|---:|---:|---:|
+| Asia Pacific | 8 | 6–10 | 112 |
+| Europe | 9 | 7–11 | 126 |
+| North America | 11 | 9–13 | 154 |
+
+Fixed staffing schedules the nominal roster every day. The seasonal-naïve and direct XGBoost policies both start each day at minimum staffing. Each remaining staff-day goes to the uncapped date with the largest forecast arrivals minus already scheduled capacity, breaking ties by earliest date. This spends the exact regional budget even when all remaining gaps are negative. Schedules are frozen at issuance.
+
+Daily expected capacity is scheduled staff × 0.93 availability × 4 requests per available person-day. Processing is continuous expected throughput, calculated in hundredths of a request. Available work equals opening backlog plus realized arrivals. Processed work is the smaller of available work and capacity. The remainder carries into the next day within that episode. Historical completions and backlog do not enter this recurrence.
+
+| Mean per 14-day region-origin episode | Backlog-days | Paired change vs fixed | Ending backlog | Peak backlog | Days above 20 |
+|---|---:|---:|---:|---:|---:|
+| Fixed | 993.01 | 0.00 | 100.82 | 122.60 | 11.63 |
+| Seasonal naïve | 945.99 | −47.03 | 100.96 | 116.08 | 11.04 |
+| Direct XGBoost | 932.11 | −60.90 | 100.21 | 113.90 | 11.15 |
+
+Backlog-days sum the daily ending backlog within an episode. The table averages 27 paired region-origin episodes equally. The windows overlap by seven days and cover 70 distinct dates. These comparisons describe alternative schedules on repeated synthetic arrivals. They cannot establish statistical significance or real operational impact.
+
+XGBoost had both lower retrospective forecast MAE and lower mean backlog-days than seasonal naïve under the tested allocation rule, with slightly more threshold-breach days. Its backlog-days were lower in 14 episodes, higher in 12, and equal in one. The comparison uses synthetic arrivals, zero opening backlog, fixed productivity and absence, overlapping episodes, and one staffing-budget scenario.
+
+The `episode_days` column in `high_arrival_summary.csv` counts 116 high-arrival episode-days per policy, representing 61 distinct region-dates. Demand exceeded the permitted maximum daily capacity on all of them. XGBoost underforecast those episode-days by 4.79 requests on average.
+
+Run the replay from the repository root with the benchmark dependencies installed.
+
+```bash
+python -B -m src.staffing_replay --input data/raw/workforce_demand.csv --output-dir reports/staffing_replay
+```
+
+The CLI uses the Phase 2 forecast code and fixed configuration at the same final origins. It checks the forecast keys, target dates, actuals, and predicted values. Outputs include daily outcomes, episode metrics and paired differences, region and origin means, overall means, high-arrival diagnostics, and a configuration manifest with data and forecast hashes. Staffing bounds apply to a single interchangeable pool. Shift assignments, skill constraints, and random daily service rates are outside this scenario.
+
 ## Tests
 
 ```bash
