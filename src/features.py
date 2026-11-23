@@ -95,22 +95,14 @@ def create_rolling_features(
 
     grouped = df.groupby("region")[target_column]
 
-    df["rolling_mean_7"] = (
-        grouped.shift(1)
-        .rolling(7)
-        .mean()
+    df["rolling_mean_7"] = grouped.transform(
+        lambda demand: demand.shift(1).rolling(7).mean()
     )
-
-    df["rolling_mean_30"] = (
-        grouped.shift(1)
-        .rolling(30)
-        .mean()
+    df["rolling_mean_30"] = grouped.transform(
+        lambda demand: demand.shift(1).rolling(30).mean()
     )
-
-    df["rolling_std_7"] = (
-        grouped.shift(1)
-        .rolling(7)
-        .std()
+    df["rolling_std_7"] = grouped.transform(
+        lambda demand: demand.shift(1).rolling(7).std()
     )
 
     return df
