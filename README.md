@@ -1,6 +1,8 @@
 # Workforce Demand Forecasting & Capacity Planning
 
-This synthetic demo forecasts daily incoming workforce operations requests in three regions and converts the forecast into an assumptions-based staffing scenario. Requests include onboarding support, worker extensions, data corrections, and new worker requests. The dashboard shows the historical forecast origin, planning dates, daily expected capacity, and required and additional scheduled staff. It exports the daily plan as CSV.
+How many staff should a region schedule for tomorrow’s incoming requests, and what happens when the same staff-day budget is allocated differently? This project explores those questions with synthetic daily arrivals in three regions. The interactive dashboard repeats the last observed week as a seasonal-naïve forecast and exports a capacity plan using your staffing, absence, and productivity assumptions.
+
+The [rolling-origin benchmark](#rolling-origin-forecast-benchmark) compares four methods at 7, 14, and 30 days using only information available when each forecast was issued. The [budget-matched staffing replay](#budget-matched-staffing-replay) then compares fixed and forecast-driven schedules on the same arrivals, measuring backlog-days and threshold breaches.
 
 ## Quickstart
 
@@ -52,7 +54,9 @@ On **1,058 region-days with a previous observed backlog**, recorded completions 
 
 ## Historical XGBoost experiment
 
-The original [training](src/train.py), [tuning](src/tune_xgboost.py), [evaluation](src/evaluate.py), [recursive forecast](src/forecast.py), and [saved artifact](models/xgboost_tuned.pkl) are retained. Use the original [experiment dependencies](requirements.txt) in a separate Python 3.12 environment to inspect or rerun those workflows. The legacy scripts write to repository-relative output locations, including the tracked tuned artifact during tuning. Run experiments in a scratch checkout and prepare the inputs there first. The legacy prediction and evaluation paths deserialize pickle files, so use only trusted artifacts.
+The original [training](src/train.py), [tuning](src/tune_xgboost.py), [evaluation](src/evaluate.py), [recursive forecast](src/forecast.py), and [saved artifact](models/xgboost_tuned.pkl) are retained. The [historical requirements freeze](requirements.txt) records that experiment’s environment and includes older packages with known advisories. The supported dashboard uses [app requirements](requirements-app.txt), and both offline benchmarks use [backtest requirements](requirements-backtest.txt). The [historical screenshots](docs/images/) show the retired XGBoost dashboard.
+
+Use a scratch checkout and an isolated environment for historical experiments. Prepare the inputs first. The legacy scripts write to repository-relative output locations, including the tracked tuned artifact during tuning. The legacy prediction and evaluation paths deserialize pickle files, so use only trusted artifacts.
 
 The historical evaluation uses chronological splits and precomputed rows with observed demand lags and realized same-day staffing. It measures one-step-style prediction with refreshed inputs. The historical recursive forecast substitutes predictions for future lag values and uses assumed staffing. Its multi-step accuracy remains unvalidated. The benchmark below fits a separate, direct XGBoost candidate from source.
 
@@ -136,4 +140,4 @@ python -m pip install -r requirements-app.txt -r requirements-backtest.txt
 python -B -m unittest discover -s tests -v
 ```
 
-The tests cover preparation, leakage and feature parity, repeatable benchmark output, capacity calculations, and a Streamlit scenario that changes staffing inputs while holding arrivals fixed.
+On pull requests, the [test workflow](.github/workflows/tests.yml) exercises preparation, forecast issue cutoffs, metrics, allocation, backlog accounting, and a Streamlit scenario that changes capacity while holding arrivals fixed. Run the workflow manually for full discovery, including model fits, repeated source-only CLI runs, and reconciliation of the exported daily and episode reports.

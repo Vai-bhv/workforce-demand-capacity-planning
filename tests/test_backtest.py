@@ -23,12 +23,14 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data/raw/workforce_demand.csv"
 
 
-class OriginTests(unittest.TestCase):
+class RegionalPanelCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.daily = aggregate_daily(pd.read_csv(RAW))
         cls.panel = daily_panel(cls.daily)
 
+
+class OriginTests(RegionalPanelCase):
     def test_splits_are_separated_and_complete(self):
         splits = benchmark_origins(self.panel)
         development, final = splits["development"], splits["final"]
@@ -46,40 +48,6 @@ class OriginTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete daily"):
             daily_panel(self.daily[self.daily["date"].ne(pd.Timestamp("2025-04-01"))])
 
-    def test_future_arrivals_and_realized_staffing_cannot_change_any_forecast(self):
-        origin = pd.Timestamp("2025-01-06")
-        changed = self.daily.copy()
-        changed.loc[changed["date"].gt(origin), "incoming_requests"] += 1000
-        changed["available_staff"] = 900
-        changed["staff_absence_rate"] = 0.99
-        before = evaluate_origins(self.panel, pd.DatetimeIndex([origin]), "development")
-        after = evaluate_origins(daily_panel(changed), pd.DatetimeIndex([origin]), "development")
-        pd.testing.assert_frame_equal(before[PREDICTION_KEYS + ["prediction"]], after[PREDICTION_KEYS + ["prediction"]])
-        np.testing.assert_array_equal(after["actual"] - before["actual"], 1000)
-
-    def test_identical_model_keys_and_exact_cumulative_horizons(self):
-        origin = pd.Timestamp("2025-10-06")
-        forecasts = evaluate_origins(self.panel, pd.DatetimeIndex([origin]), "final")
-        self.assertFalse(forecasts.duplicated(PREDICTION_KEYS).any())
-        self.assertEqual(set(forecasts.groupby("model_name").groups), set(MODEL_NAMES))
-        self.assertEqual(tuple(sorted(forecasts["horizon"].unique())), (7, 14, 30))
-        self.assertTrue(forecasts["target_date"].gt(forecasts["forecast_origin"]).all())
-        self.assertTrue(
-            (forecasts["target_date"] - forecasts["forecast_origin"]).dt.days.eq(forecasts["lead"]).all()
-        )
-        expected = forecasts.loc[forecasts["model_name"].eq(MODEL_NAMES[0]), TARGET_KEYS + ["actual"]]
-        for _, result in forecasts.groupby("model_name"):
-            pd.testing.assert_frame_equal(result[expected.columns].reset_index(drop=True), expected.reset_index(drop=True))
-            for horizon, rows in result.groupby("horizon"):
-                self.assertEqual(set(rows["lead"]), set(range(1, horizon + 1)))
-                self.assertEqual(len(rows), horizon * len(self.panel.columns))
-                full = result.loc[result["horizon"].eq(30)].set_index(["region", "lead"])
-                np.testing.assert_array_equal(rows["prediction"], full.loc[list(zip(rows["region"], rows["lead"])), "prediction"])
-        naive = forecasts[forecasts["model_name"].eq("seasonal_naive") & forecasts["horizon"].eq(30)]
-        dates = origin + pd.to_timedelta((naive["lead"] - 1) % 7 - 6, unit="D")
-        expected_naive = [self.panel.at[date, region] for date, region in zip(dates, naive["region"])]
-        np.testing.assert_array_equal(naive["prediction"], expected_naive)
-
     def test_same_weekday_average_uses_the_last_four_observed_weekdays(self):
         origin = pd.Timestamp("2025-01-06")
         observed = self.panel.loc[:origin]
@@ -91,18 +59,6 @@ class OriginTests(unittest.TestCase):
         np.testing.assert_array_equal(weekday_average(observed, forecast_dates), expected)
         with self.assertRaisesRegex(ValueError, "28 observed days"):
             weekday_average(observed.tail(27), forecast_dates)
-
-    def test_ridge_fit_receives_only_the_observed_target(self):
-        origin = pd.Timestamp("2025-01-06")
-        observed = self.panel.loc[:origin]
-        estimator = Ridge(alpha=10.0, solver="cholesky")
-        with patch("src.backtest_models.Ridge", return_value=estimator), patch.object(
-            estimator, "fit", wraps=estimator.fit
-        ) as fit:
-            forecast_at_origin(self.panel, origin)
-        features, labels = fit.call_args.args
-        np.testing.assert_array_equal(labels, observed.to_numpy().ravel())
-        self.assertEqual(len(features), observed.size)
 
     def test_direct_training_and_inference_features_match_at_same_issue(self):
         through = pd.Timestamp("2025-01-06")
@@ -140,6 +96,54 @@ class OriginTests(unittest.TestCase):
         with patch("src.backtest_models.direct_rows", side_effect=check_training_rows) as build_rows:
             direct_training_data(history)
         build_rows.assert_called_once()
+
+
+class FittedForecastTests(RegionalPanelCase):
+    def test_future_arrivals_and_realized_staffing_cannot_change_any_forecast(self):
+        origin = pd.Timestamp("2025-01-06")
+        changed = self.daily.copy()
+        changed.loc[changed["date"].gt(origin), "incoming_requests"] += 1000
+        changed["available_staff"] = 900
+        changed["staff_absence_rate"] = 0.99
+        before = evaluate_origins(self.panel, pd.DatetimeIndex([origin]), "development")
+        after = evaluate_origins(daily_panel(changed), pd.DatetimeIndex([origin]), "development")
+        pd.testing.assert_frame_equal(before[PREDICTION_KEYS + ["prediction"]], after[PREDICTION_KEYS + ["prediction"]])
+        np.testing.assert_array_equal(after["actual"] - before["actual"], 1000)
+
+    def test_identical_model_keys_and_exact_cumulative_horizons(self):
+        origin = pd.Timestamp("2025-10-06")
+        forecasts = evaluate_origins(self.panel, pd.DatetimeIndex([origin]), "final")
+        self.assertFalse(forecasts.duplicated(PREDICTION_KEYS).any())
+        self.assertEqual(set(forecasts.groupby("model_name").groups), set(MODEL_NAMES))
+        self.assertEqual(tuple(sorted(forecasts["horizon"].unique())), (7, 14, 30))
+        self.assertTrue(forecasts["target_date"].gt(forecasts["forecast_origin"]).all())
+        self.assertTrue(
+            (forecasts["target_date"] - forecasts["forecast_origin"]).dt.days.eq(forecasts["lead"]).all()
+        )
+        expected = forecasts.loc[forecasts["model_name"].eq(MODEL_NAMES[0]), TARGET_KEYS + ["actual"]]
+        for _, result in forecasts.groupby("model_name"):
+            pd.testing.assert_frame_equal(result[expected.columns].reset_index(drop=True), expected.reset_index(drop=True))
+            for horizon, rows in result.groupby("horizon"):
+                self.assertEqual(set(rows["lead"]), set(range(1, horizon + 1)))
+                self.assertEqual(len(rows), horizon * len(self.panel.columns))
+                full = result.loc[result["horizon"].eq(30)].set_index(["region", "lead"])
+                np.testing.assert_array_equal(rows["prediction"], full.loc[list(zip(rows["region"], rows["lead"])), "prediction"])
+        naive = forecasts[forecasts["model_name"].eq("seasonal_naive") & forecasts["horizon"].eq(30)]
+        dates = origin + pd.to_timedelta((naive["lead"] - 1) % 7 - 6, unit="D")
+        expected_naive = [self.panel.at[date, region] for date, region in zip(dates, naive["region"])]
+        np.testing.assert_array_equal(naive["prediction"], expected_naive)
+
+    def test_ridge_fit_receives_only_the_observed_target(self):
+        origin = pd.Timestamp("2025-01-06")
+        observed = self.panel.loc[:origin]
+        estimator = Ridge(alpha=10.0, solver="cholesky")
+        with patch("src.backtest_models.Ridge", return_value=estimator), patch.object(
+            estimator, "fit", wraps=estimator.fit
+        ) as fit:
+            forecast_at_origin(self.panel, origin)
+        features, labels = fit.call_args.args
+        np.testing.assert_array_equal(labels, observed.to_numpy().ravel())
+        self.assertEqual(len(features), observed.size)
 
     def test_clean_tracked_source_preparation_and_repeatable_cli(self):
         with TemporaryDirectory() as directory:
